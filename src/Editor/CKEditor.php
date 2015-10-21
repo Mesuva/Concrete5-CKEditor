@@ -43,23 +43,42 @@ class CKEditor implements EditorInterface
         $options = array_merge(
             $options,
             array(
+                'startupFocus'=> true,
+                'floatSpaceDockedOffsetX'=> 150,
+                'floatSpaceDockedOffsetY'=> 14,
                 'plugins' => implode(',', $plugins),
             )
         );
         $options = json_encode($options);
         $html = <<<EOL
-        <script type="text/javascript">
-        var CCM_EDITOR_SECURITY_TOKEN = "{$this->token}";
-        $(function() {
-            var ckeditor = $('#{$identifier}').ckeditor({$options}).editor;
-            ckeditor.on('blur',function(){
-                return false;
-            });
-            ckeditor.on('remove', function(){
-                $(this).destroy();
-            });
-        });
-        </script>
+        <script>
+  CKEDITOR.disableAutoInline = true;
+  CKEDITOR.inline( '{$identifier}', {$options});
+
+  $('.cancel-inline').click(function(){
+    ConcreteEvent.fire('EditModeExitInline');
+    Concrete.getEditMode().scanBlocks();
+  });
+
+  $('.save-inline').click(function(){
+    $('#ccm-block-form textarea').val( CKEDITOR.instances.{$identifier}.getData() );
+    $('#ccm-block-form').submit();
+    ConcreteEvent.fire('EditModeExitInlineSaved');
+    ConcreteEvent.fire('EditModeExitInline', {
+      action: 'save_inline'
+    });
+  });
+
+</script>
+
+<style>
+  #{$identifier} {
+    outline: none;
+  }
+  #ccm-menu-click-proxy, .ccm-area-footer {
+    display: none;
+  }
+</style>
 EOL;
         return $html;
     }
@@ -68,7 +87,17 @@ EOL;
     {
         $identifier = id(new Identifier())->getString(32);
         $this->getPluginManager()->select('concrete5inline');
-        $html = sprintf(
+        $html = '<ul class="ccm-inline-toolbar">
+  <li class="ccm-inline-toolbar-button ccm-inline-toolbar-button-cancel">
+  <button  class="btn cancel-inline">' . t('Cancel') . '</button>
+  </li>
+
+  <li class="ccm-inline-toolbar-button ccm-inline-toolbar-button-save">
+    <button class="btn btn-primary save-inline">' . t('Save') . '</button>
+  </li>
+
+</ul>';
+        $html .= sprintf(
             '<textarea id="%s_content" style="display:none;" name="%s"></textarea>
             <div contenteditable="true" id="%s">%s</div>',
             $identifier,
@@ -83,6 +112,7 @@ EOL;
                 'disableAutoInline' => true
             )
         );
+
         return $html;
     }
 
